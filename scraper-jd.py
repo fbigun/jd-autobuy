@@ -20,8 +20,9 @@ import time
 import json
 import random
 
-
+from multiprocessing.dummy import Pool as ThreadPool
 import argparse
+
 #from selenium import webdriver
 
 
@@ -92,7 +93,7 @@ class JDWrapper(object):
 			'User-Agent' : 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36',
 			'ContentType': 'text/html; charset=utf-8',
 			'Accept-Encoding':'gzip, deflate, sdch',
-        	'Accept-Language':'zh-CN,zh;q=0.8',
+			'Accept-Language':'zh-CN,zh;q=0.8',
 			'Connection' : 'keep-alive',
 		}
 		
@@ -589,6 +590,61 @@ class JDWrapper(object):
 			return self.order_info(options.submit)
 
 		return False
+	def buys(self, options, opt):
+		# stock detail
+		good_data = self.good_detail(opt)
+
+		# retry until stock not empty
+		if good_data['stock'] != 33:
+			# flush stock state
+			while good_data['stock'] != 33 and options.flush:
+				print u'<%s> <%s>' % (good_data['stockName'], good_data['name'])
+				time.sleep(options.wait / 1000.0)
+				good_data['stock'], good_data['stockName'] = self.good_stock(stock_id=opt, area_id=options.area)
+				
+			# retry detail
+			#good_data = self.good_detail(options.good)
+			
+
+		# failed 
+		link = good_data['link']
+		if good_data['stock'] != 33 or link == '':
+			#print u'stock {0}, link {1}'.format(good_data['stock'], link)
+			return False
+
+		try:
+			# change buy count
+			if options.count != 1:
+				link = link.replace('pcount=1', 'pcount={0}'.format(options.count))
+
+			# add to cart
+			resp = self.sess.get(link, cookies = self.cookies)
+			soup = bs4.BeautifulSoup(resp.text, "html.parser")
+
+			# tag if add to cart succeed
+			tag = soup.select('h3.ftx-02')
+			if tag is None:
+				tag = soup.select('div.p-name a')
+
+			if tag is None or len(tag) == 0:
+				print u'添加到购物车失败'
+				return False
+			
+			print '+++++++++++++++++++++++++++++++++++++++++++++++++++++++'
+			print u'{0} > 购买详情'.format(time.ctime())
+			print u'链接：{0}'.format(link)
+			print u'结果：{0}'.format(tags_val(tag))
+
+			# change count after add to shopping cart
+			#self.buy_good_count(options.good, options.count)
+			
+		except Exception, e:
+			print 'Exp {0} : {1}'.format(FuncName(), e)
+		else:
+			self.cart_detail()
+			return self.order_info(options.submit)
+
+		return False
 
 	def buy_good_count(self, good_id, count):
 		url = 'http://cart.jd.com/changeNum.action'
@@ -719,15 +775,25 @@ class JDWrapper(object):
 
 		return False
 
+def zhixing(options, opt):
+	while not jd.buys(options, opt) and options.flush:
+		time.sleep(options.wait / 1000.0)
 
 def main(options):
-	# 
+	#
+	global jd
 	jd = JDWrapper()
+	pool = ThreadPool(4)
 	if not jd.login_by_QR():
 		return
-
-	while not jd.buy(options) and options.flush:
-		time.sleep(options.wait / 1000.0)
+	if options.goods:
+		print options.goods
+		pool.map(zhixing, [options for i in options.goods], options.goods)
+		pool.close()
+		pool.join()
+	else:
+		while not jd.buy(options) and options.flush:
+			time.sleep(options.wait / 1000.0)
 
 
 if __name__ == '__main__':
@@ -741,6 +807,9 @@ if __name__ == '__main__':
 						help='Area string, like: 1_72_2799_0 for Beijing', default='1_72_2799_0')	
 	parser.add_argument('-g', '--good', 
 						help='Jing Dong good ID', default='')
+	parser.add_argument('-x', '--goods',
+						action='append',
+						help='Jing Dong goods ID', default=[])
 	parser.add_argument('-c', '--count', type=int, 
 						help='The count to buy', default=1)
 	parser.add_argument('-w', '--wait', 
@@ -763,6 +832,8 @@ if __name__ == '__main__':
 	# for test
 	if options.good == '':
 		options.good = iphone_7
+		options.flush = True
+		options.goods = ['4993737', '4993773', '4993751']
 	
 	'''
 	if options.password == '' or options.username == '':
