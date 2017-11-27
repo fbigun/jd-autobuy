@@ -831,15 +831,22 @@ if __name__ == '__main__':
 	print options
 
 	# for test
-	if options.good == '':
+	if not options.good:
 		options.good = iphone_7
 		options.flush = True
+	if not options.goods:
+		options.area='1_72_2799_0'
 		options.goods = ['4993737', '4993773', '4993751']
+		options.flush = True
+		options.submit = True
 
 	'''
 	if options.password == '' or options.username == '':
 		print u'请输入用户名密码'
 		exit(1)
 	'''
+	print u'--------------------- 取值 -------------------------'
+	print 'options', options
+	print '----------------------------------------------------'
 	main(options)
 
