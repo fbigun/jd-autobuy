@@ -19,6 +19,7 @@ import os
 import time
 import json
 import random
+import pickle
 
 from multiprocessing.dummy import Pool as ThreadPool
 import argparse
@@ -273,8 +274,8 @@ class JDWrapper(object):
 
 
 	def login_by_QR(self):
-		if self.hot_login:
-			return
+		if self.hot_login():
+			return True
 		# jd login by QR code
 		try:
 			print '+++++++++++++++++++++++++++++++++++++++++++++++++++++++'
@@ -779,16 +780,22 @@ class JDWrapper(object):
 
 		return False
 
-	def hot_Login():
+	def hot_login(self):
 		try:
-			whith open('cookies.pkl', 'rb') as f:
+			with open('cookies.pkl', 'rb') as f:
 				self.cookies = pickle.load(f)
 		except Exception as e:
+			self.cookies = {}
 			return False
-		self.check_login_status()
+		return self.check_login_status()
 
-	def check_login_status():
-		return True
+	def check_login_status(self):
+		home_url = 'https://home.jd.com'
+		rsp = self.sess.get(home_url, cookies = self.cookies)
+		if rsp.status_code == requests.codes.OK:
+			return True
+		self.cookies = {}
+		return False
 
 
 
