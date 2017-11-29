@@ -273,6 +273,8 @@ class JDWrapper(object):
 
 
 	def login_by_QR(self):
+		if self.hot_login:
+			return
 		# jd login by QR code
 		try:
 			print '+++++++++++++++++++++++++++++++++++++++++++++++++++++++'
@@ -403,6 +405,8 @@ class JDWrapper(object):
 			self.headers['P3P'] = resp.headers.get('P3P')
 			for k, v in resp.cookies.items():
 				self.cookies[k] = v
+			with open('cookies.pkl', 'wb') as f:
+				pickle.dump(self.cookies, f)
 
 			print u'登陆成功'
 			return True
@@ -775,6 +779,17 @@ class JDWrapper(object):
 
 		return False
 
+	def hot_Login():
+		try:
+			whith open('cookies.pkl', 'rb') as f:
+				self.cookies = pickle.load(f)
+		except Exception as e:
+			return False
+		self.check_login_status()
+
+	def check_login_status():
+		return True
+
 
 
 def main(options):
@@ -783,8 +798,9 @@ def main(options):
 	jd = JDWrapper()
 	pool = ThreadPool(4)
 	def zhixing(opt):
-		while not jd.buys(options, opt) and options.flush:
-			time.sleep(options.wait / 1000.0)
+		for i in range(5):
+			while not jd.buys(options, opt) and options.flush:
+				time.sleep(options.wait / 1000.0)
 	if not jd.login_by_QR():
 		return
 	if options.goods:
